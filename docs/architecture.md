@@ -2,7 +2,7 @@
 
 ## Overview
 
-The pipeline takes a source video and a text prompt describing props to add, then produces an edited video where those props are composited into the original motion. It runs entirely inside ComfyUI using the WanVideoWrapper custom node set.
+The pipeline takes a source video and a text prompt, then produces an edited video that follows the original motion while reflecting whatever the prompt describes — added objects, changed clothing, style shifts, background elements, or any other visual edit. The prompt is the only creative input; everything else is configuration. It runs entirely inside ComfyUI using the WanVideoWrapper custom node set.
 
 ```
 Source Video (MP4)
@@ -59,7 +59,7 @@ Source Video (MP4)
 
 | Input | Value | Notes |
 |---|---|---|
-| video | birds_source.mp4 | Looked up in `ComfyUI/input/` |
+| video | source.mp4 | Looked up in `ComfyUI/input/` — replace with your filename |
 | force_rate | 16 | Resamples to 16 fps |
 | custom_width / height | 832 × 480 | Resizes on load |
 | frame_load_cap | 49 | Max frames to load |
@@ -147,7 +147,7 @@ vace_latent:
 | Input | Value |
 |---|---|
 | model_name | umt5-xxl-enc-fp8_e4m3fn.safetensors |
-| positive_prompt | "two birds… one holding a guitar…" |
+| positive_prompt | Your scene description with the desired change |
 | negative_prompt | "blurry, distorted…" |
 | use_disk_cache | true |
 
@@ -239,9 +239,9 @@ vace_latent:
 |---|---|
 | frame_rate | 16 |
 | format | video/h264-mp4 |
-| filename_prefix | birds_prop_test |
+| filename_prefix | vace_output |
 
-**Output:** MP4 saved to `ComfyUI/output/birds_prop_test_00001.mp4`
+**Output:** MP4 saved to `ComfyUI/output/vace_output_00001.mp4`
 
 ---
 
@@ -280,5 +280,5 @@ The VACE conditioning conv has fixed weight shape `[5120, 96, 1, 2, 2]` — alwa
 | Text encoder | `~/projects/ComfyUI/models/text_encoders/umt5-xxl-enc-fp8_e4m3fn.safetensors` |
 | Workflow JSON | `workflows/vace_prop_addition.json` |
 | Patched nodes | `~/projects/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/nodes.py` |
-| Input video | `~/projects/ComfyUI/input/birds_source.mp4` |
-| Output video | `~/projects/ComfyUI/output/birds_prop_test_00001.mp4` |
+| Input video | `~/projects/ComfyUI/input/source.mp4` (rename to match your file) |
+| Output video | `~/projects/ComfyUI/output/vace_output_00001.mp4` |

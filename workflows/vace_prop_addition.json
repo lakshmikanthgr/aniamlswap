@@ -2,7 +2,7 @@
   "1": {
     "class_type": "VHS_LoadVideo",
     "inputs": {
-      "video": "birds_source.mp4",
+      "video": "source.mp4",
       "force_rate": 16,
       "custom_width": 832,
       "custom_height": 480,
@@ -37,8 +37,8 @@
     "inputs": {
       "model_name": "umt5-xxl-enc-fp8_e4m3fn.safetensors",
       "precision": "bf16",
-      "positive_prompt": "two birds playing together, one bird holding a small guitar, the other bird with a microphone in front of it, identical pose and motion to original, same playful energy, photorealistic, natural lighting, consistent with original scene",
-      "negative_prompt": "blurry, distorted, extra limbs, deformed guitar, floating objects, disconnected props, flickering, inconsistent motion, morphing",
+      "positive_prompt": "DESCRIBE YOUR SCENE HERE with the prop or change you want added, identical pose and motion to original, photorealistic, natural lighting, consistent with original scene",
+      "negative_prompt": "blurry, distorted, extra limbs, floating objects, disconnected props, flickering, inconsistent motion, morphing",
       "quantization": "disabled",
       "use_disk_cache": true,
       "device": "gpu"
@@ -100,7 +100,7 @@
       "images": ["7", 0],
       "frame_rate": 16,
       "loop_count": 0,
-      "filename_prefix": "birds_prop_test",
+      "filename_prefix": "vace_output",
       "format": "video/h264-mp4",
       "pingpong": false,
       "save_output": true

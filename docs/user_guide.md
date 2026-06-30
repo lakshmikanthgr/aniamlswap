@@ -1,10 +1,17 @@
-# User Guide — WAN2.2 VACE Prop-Addition
+# User Guide — WAN2.2 VACE Video Editing
 
 ## What This Does
 
-Takes a source video and adds props to it using AI video diffusion. The model sees the original motion and generates frames where new objects (props) are integrated, matching the existing lighting, movement, and style.
+Takes any source video and edits it based on a text prompt — adding objects, changing appearance, swapping styles — while preserving the original motion, lighting, and scene structure. The only thing you change between runs is the prompt and the source video.
 
-Example: source video of two birds → output video of the same birds, one holding a guitar.
+**What you can do with a prompt:**
+- Add a prop to a subject ("person holding a red umbrella")
+- Change what a subject is wearing ("same person but in a winter jacket")
+- Add a background element ("a cat sitting in the corner of the room")
+- Change the style ("same scene but at night with neon lighting")
+- Remove or replace objects ("person without the hat")
+
+The workflow is not specific to any subject or prop. Whatever you describe in the positive prompt, the model will attempt to generate it while keeping the source motion intact.
 
 ---
 
@@ -13,7 +20,7 @@ Example: source video of two birds → output video of the same birds, one holdi
 | Component | Requirement |
 |---|---|
 | GPU | RTX 3060 12GB minimum (block swap required). 24GB+ recommended for speed. |
-| ComfyUI | Installed at `~/projects/ComfyUI` with Python venv |
+| ComfyUI | Installed with Python venv |
 | OS | Ubuntu / Linux |
 
 ### Required models (download once)
@@ -41,8 +48,6 @@ hf_hub_download(
 
 ### Required custom nodes
 
-Install via ComfyUI Manager or manually:
-
 ```bash
 cd ~/projects/ComfyUI/custom_nodes
 
@@ -55,7 +60,7 @@ git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git
 cd ComfyUI-VideoHelperSuite && pip install -r requirements.txt && cd ..
 ```
 
-> **IMPORTANT:** After cloning WanVideoWrapper, apply the patches described in [Patches](#patches-required) before running. The unpatched version has bugs with the VACE Fun A14B model.
+> **IMPORTANT:** After cloning WanVideoWrapper, apply the patches in [Patches Required](#patches-required). The unpatched version has bugs with the VACE Fun A14B model.
 
 ---
 
@@ -69,168 +74,195 @@ source venv/bin/activate
 python main.py --lowvram
 ```
 
-Wait for: `To see the GUI go to: http://127.0.0.1:8188`
+### 2. Place your source video
 
-### 2. Prepare your source video
-
-Copy your video to `ComfyUI/input/`:
 ```bash
-cp /path/to/your/video.mp4 ~/projects/ComfyUI/input/birds_source.mp4
+cp /path/to/your/video.mp4 ~/projects/ComfyUI/input/source.mp4
 ```
 
-Target: 832×480, 16 fps, under 49 frames (~3 seconds). Other sizes work but affect VRAM.
+Recommended: 832×480, 16 fps, ≤49 frames (~3 seconds). Other sizes work but affect VRAM.
 
 ### 3. Edit the workflow
 
-Open `workflows/vace_prop_addition.json` and change:
+Open `workflows/vace_prop_addition.json` and update these three things:
 
-**Node 1** — your video filename:
+**Your video filename (node 1):**
 ```json
-"video": "your_video.mp4"
+"video": "source.mp4"
 ```
 
-**Node 3** — match your video dimensions and frame count:
+**Video dimensions and frame count (node 3) — must match the actual video:**
 ```json
 "width": 832,
 "height": 480,
 "num_frames": 49
 ```
 
-**Node 4** — your prompts:
+**Your prompt (node 4) — this is the only creative input:**
 ```json
-"positive_prompt": "describe what you want added or changed",
-"negative_prompt": "describe what to avoid"
+"positive_prompt": "describe the full scene with the change you want",
+"negative_prompt": "blurry, distorted, floating objects, flickering, inconsistent motion"
 ```
 
-### 4. Run the workflow
+### 4. Run
 
 ```bash
 cd ~/projects/video_swap
 python3 scripts/run_workflow.py
 ```
 
-Output will be at `~/projects/ComfyUI/output/birds_prop_test_00001.mp4`.
+Output: `~/projects/ComfyUI/output/vace_output_00001.mp4`
 
-Expected runtime on RTX 3060 12GB: **~21 minutes** (94s/step × 20 steps).
-
----
-
-## Prompt Writing Tips
-
-**Positive prompt** — describe the full scene including the prop:
-```
-two birds on a branch, one bird holding a small red guitar,
-natural lighting, photorealistic, consistent motion
-```
-
-**Negative prompt** — describe artifacts to suppress:
-```
-blurry, distorted, floating objects, extra limbs,
-flickering, inconsistent motion
-```
-
-**Strength (node 3)** — controls how much the original video influences the output:
-- `1.0` — fully guided by source motion
-- `0.5–0.8` — model has more freedom to deviate
-- `0.0` — ignores source completely (pure text-to-video)
-
-**Steps (node 6)** — default 20 is a reasonable trade-off. More steps = better quality, longer runtime.
+Expected runtime on RTX 3060 12GB: ~21 minutes (94s/step × 20 steps).
 
 ---
 
-## Using a Mask
+## Writing Prompts
 
-By default the full frame is eligible for editing. To restrict changes to a specific region, connect a `MASK` tensor to node 3's `input_masks` input.
+The positive prompt drives everything. Describe the **full scene** as you want it to appear — not just the change. The model uses this description to regenerate the video while the VACE conditioning keeps the original motion intact.
 
-- White (1.0) = the model can edit here
-- Black (0.0) = preserve the original
+### Structure that works well
 
-You can create masks with any ComfyUI mask node, or use SAM2 (`ComfyUI-segment-anything-2`) to auto-segment a subject.
+```
+[subject description], [what changed or added], [motion/pose context], [style/quality terms]
+```
+
+### Examples across different use cases
+
+**Adding a held object:**
+```
+positive: a person walking down the street, holding a large red balloon, 
+          same natural walk cycle, photorealistic, consistent lighting
+negative: blurry, floating objects, disconnected prop, flickering
+```
+
+**Changing clothing:**
+```
+positive: same person, now wearing a bright yellow raincoat and boots,
+          identical movement and pose, photorealistic, consistent with original scene
+negative: morphing, inconsistent texture, flickering outfit
+```
+
+**Adding a background element:**
+```
+positive: same scene, a small dog sitting near the doorway in the background,
+          natural lighting, photorealistic, consistent motion in foreground
+negative: distorted, extra people, flickering, inconsistent background
+```
+
+**Style change:**
+```
+positive: same scene rendered in a hand-drawn animation style, 
+          warm colors, consistent motion
+negative: photorealistic, blurry, flickering
+```
+
+### Tips
+
+- **Always describe the original subject** in the positive prompt, not just the new element. The model needs to know what to keep.
+- **Mirror wording between positive and negative** — if you said "guitar" in the positive, don't include "deformed guitar" in the negative unless needed. Only negate things that commonly appear as artifacts.
+- **Keep the negative prompt generic** — `blurry, distorted, flickering, inconsistent motion` works for almost any use case without over-constraining generation.
+- **Strength (node 3)** controls how tightly the output follows the source video:
+  - `0.85–1.0` — strong motion preservation, less creative freedom
+  - `0.5–0.8` — looser, model can reinterpret the scene more
+  - `<0.5` — rarely useful; starts to ignore source motion
 
 ---
 
-## Using a Reference Image
+## Using a Mask (Optional)
 
-If you have an image of the prop you want to add, connect it to node 3's `ref_images` input. The model will use it as a visual reference for the prop's appearance. Useful for specific objects like a branded product or a particular instrument.
+By default, VACE can edit the entire frame. A mask restricts where changes happen:
+
+- White `(1.0)` = the model can edit this region
+- Black `(0.0)` = preserve the original pixels here
+
+Connect a `MASK` tensor to node 3's `input_masks` input. You can:
+- Draw a mask in ComfyUI's built-in mask editor
+- Use SAM2 (`ComfyUI-segment-anything-2`) to auto-segment a subject by clicking on it
+- Use any other ComfyUI mask node
+
+**Example:** To add an object to a person's hand without changing the background, mask only the hand region.
 
 ---
 
-## Adjusting for Your GPU
+## Using a Reference Image (Optional)
 
-**Node 9 — WanVideoBlockSwap** controls VRAM usage vs speed:
+Connect an image to node 3's `ref_images` input. The model uses it as a visual reference for a specific object's appearance.
 
-| GPU VRAM | blocks_to_swap | vace_blocks_to_swap | Expected speed |
+Useful when you want the added prop to match a specific design (e.g., a branded product, a specific book cover, a logo on a t-shirt) rather than letting the model invent its own version.
+
+---
+
+## GPU / VRAM Settings
+
+**Node 9 — WanVideoBlockSwap** offloads transformer blocks to CPU to fit the model in VRAM:
+
+| GPU VRAM | `blocks_to_swap` | `vace_blocks_to_swap` | Speed |
 |---|---|---|---|
 | 12 GB | 30 | 8 | ~94s/step |
 | 16 GB | 20 | 5 | ~40s/step |
-| 24 GB | 0 | 0 | ~8s/step |
+| 24 GB+ | 0 | 0 | ~8s/step |
 
-Set both to 0 to disable block swapping entirely (fastest, needs 24GB+).
+A14B has 40 transformer blocks and 15 VACE blocks total. Higher swap = lower VRAM, slower speed.
 
 ---
 
-## Workflow File Reference
+## Workflow Node Reference
 
-`workflows/vace_prop_addition.json` — 9 nodes:
-
-| Node | Class | Role |
+| Node | Class | What to change |
 |---|---|---|
-| 1 | VHS_LoadVideo | Load source video |
-| 2 | WanVideoVAELoader | Load VAE model |
-| 3 | WanVideoVACEEncode | Encode source frames as VACE conditioning |
-| 4 | WanVideoTextEncodeCached | Encode text prompts |
-| 5 | WanVideoModelLoader | Load diffusion transformer |
-| 6 | WanVideoSampler | Run denoising (the main generation step) |
-| 7 | WanVideoDecode | Decode latents to frames |
-| 8 | VHS_VideoCombine | Save frames as MP4 |
-| 9 | WanVideoBlockSwap | VRAM management config |
+| 1 | VHS_LoadVideo | `video` filename, `custom_width`, `custom_height`, `frame_load_cap` |
+| 2 | WanVideoVAELoader | Leave as-is (`Wan2_1_VAE_bf16.safetensors`) |
+| 3 | WanVideoVACEEncode | `width`, `height`, `num_frames`, `strength` |
+| 4 | WanVideoTextEncodeCached | **`positive_prompt`** and `negative_prompt` |
+| 5 | WanVideoModelLoader | Leave as-is |
+| 6 | WanVideoSampler | `steps`, `cfg`, `seed` if needed |
+| 7 | WanVideoDecode | Leave as-is |
+| 8 | VHS_VideoCombine | `filename_prefix` if you want named outputs |
+| 9 | WanVideoBlockSwap | `blocks_to_swap`, `vace_blocks_to_swap` per GPU |
 
-For full details on each node's inputs and outputs, see [architecture.md](architecture.md).
+See [architecture.md](architecture.md) for full input/output types of every node.
 
 ---
 
 ## Patches Required
 
-The stock `ComfyUI-WanVideoWrapper` has bugs when used with the VACE Fun A14B model. Three methods in `nodes.py` must be patched manually.
+The stock `ComfyUI-WanVideoWrapper` has three bugs with the VACE Fun A14B model. Patch `nodes.py` manually after cloning.
 
 File: `~/projects/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/nodes.py`
 
 ### Patch 1 — `WanVideoVACEEncode.process`
 
-**Problem:** Hardcodes `z_dim=16` and `spatial_stride=8` in `target_shape` and mask computation regardless of which VAE is loaded.
+Hardcodes spatial stride and z_dim instead of reading from the loaded VAE.
 
-**Fix:** Read both values from the VAE object:
 ```python
+# Replace hardcoded values with:
 _spatial_stride = getattr(vae, 'upsampling_factor', VAE_STRIDE[1])
 _z_dim = getattr(vae, 'z_dim', 16)
 target_shape = (_z_dim, (num_frames - 1) // VAE_STRIDE[0] + 1,
                 height // _spatial_stride,
                 width // _spatial_stride)
-```
 
-And pass `spatial_stride` when calling `vace_encode_masks`:
-```python
+# And when calling vace_encode_masks:
 spatial_stride = getattr(vae, 'upsampling_factor', VAE_STRIDE[1])
 m0 = self.vace_encode_masks(input_masks, ref_images, spatial_stride=spatial_stride)
 ```
 
 ### Patch 2 — `vace_encode_masks`
 
-**Problem:** Uses hardcoded `VAE_STRIDE[1]` (=8) for mask downsampling.
+Hardcodes spatial stride = 8, breaking mask shape for VAE38.
 
-**Fix:** Accept `spatial_stride` as a parameter:
 ```python
 def vace_encode_masks(self, masks, ref_images=None, spatial_stride=None):
     if spatial_stride is None:
         spatial_stride = VAE_STRIDE[1]
-    # then use spatial_stride throughout instead of VAE_STRIDE[1]
+    # use spatial_stride in place of VAE_STRIDE[1] throughout the method
 ```
 
 ### Patch 3 — `vace_latent`
 
-**Problem:** Always concatenates `z0 + m0`, which produces 352 channels for VAE38 (96+256) — but the VACE conv expects exactly 96 channels.
+Always concatenates z + mask → wrong channel count for VAE38.
 
-**Fix:** Clip to 96 channels, filling from mask only as needed:
 ```python
 def vace_latent(self, z, m):
     VACE_CONV_CHANNELS = 96
@@ -244,7 +276,7 @@ def vace_latent(self, z, m):
     return result
 ```
 
-> **Warning:** `git pull` on WanVideoWrapper will overwrite these patches. Re-apply after any update.
+> **Note:** `git pull` on WanVideoWrapper overwrites these patches. Re-apply after any update.
 
 ---
 
@@ -252,15 +284,9 @@ def vace_latent(self, z, m):
 
 | Error | Cause | Fix |
 |---|---|---|
-| `Value not in list` for text encoder | ComfyUI doesn't expose `.gguf` in text_encoders folder | Use `.safetensors` T5 encoder instead |
-| `Expected size 30 but got size 60` | Unpatched `vace_encode_masks` | Apply Patch 1 + 2 above |
-| `expected input to have 96 channels, got 352` | Unpatched `vace_latent` | Apply Patch 3 above |
-| OOM during sampling | 10.8GB model too large for VRAM headroom | Increase `blocks_to_swap` in node 9 |
-| `tensor 16 must match 48` at decode | Wrong VAE loaded (VAE38 used with A14B) | Use `Wan2_1_VAE_bf16.safetensors`, not `wan2.2_vae.safetensors` |
-| Workflow timeout | Sampling is slow with block swap on 12GB GPU | Normal — A14B takes ~21 min on RTX 3060 |
-
----
-
-## Full Error History
-
-See [test_report.md](test_report.md) for the complete log of all 7 errors encountered during initial setup and their fixes.
+| `Value not in list` for text encoder | `.gguf` files not exposed in text_encoders | Use `.safetensors` T5 encoder |
+| `Expected size 30 but got size 60` | Unpatched `vace_encode_masks` | Apply Patch 1 + 2 |
+| `expected 96 channels, got 352` | Unpatched `vace_latent` | Apply Patch 3 |
+| OOM during sampling | Model too large for VRAM | Increase `blocks_to_swap` in node 9 |
+| `tensor 16 must match 48` at decode | Wrong VAE — `wan2.2_vae.safetensors` is for 5B model only | Use `Wan2_1_VAE_bf16.safetensors` |
+| Very slow (~94s/step) | Block swapping to CPU | Normal on 12GB GPU — 24GB removes this overhead |
