@@ -53,26 +53,30 @@ def probe_video(path):
 def build_vf_filter(src_w, src_h, tgt_w, tgt_h, start_s, num_frames, fps):
     """
     Build an ffmpeg -vf filter string that:
-      1. Seeks to start_s
-      2. Crops to target aspect ratio (centre crop, no black bars)
-      3. Scales to target resolution
-      4. Limits to num_frames frames at target fps
+      1. Crops to target aspect ratio
+         - Landscape source (wider than target): centre crop on width
+         - Portrait source (taller than target): top-biased crop on height
+           (subject is usually near the top in phone/Shorts videos)
+      2. Scales to target resolution
+      3. Limits to num_frames frames at target fps
     """
     src_ar = src_w / src_h
     tgt_ar = tgt_w / tgt_h
 
     if src_ar > tgt_ar:
-        # Source is wider — crop width
+        # Source is wider — centre crop width
         crop_h = src_h
         crop_w = int(src_h * tgt_ar)
         crop_x = (src_w - crop_w) // 2
         crop_y = 0
     else:
-        # Source is taller — crop height
+        # Source is taller (portrait) — top-biased crop height
+        # Take from the top 20% down so subject head is not cut off
         crop_w = src_w
         crop_h = int(src_w / tgt_ar)
         crop_x = 0
-        crop_y = (src_h - crop_h) // 2
+        # Start 10% from top instead of centre — keeps heads in frame
+        crop_y = int(src_h * 0.10)
 
     duration_s = num_frames / fps
     filters = [
