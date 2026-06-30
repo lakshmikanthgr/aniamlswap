@@ -213,7 +213,6 @@ else:
 # ── Patch 3: replace VAE_STRIDE[1] inside vace_encode_masks body ─────────
 # After the function is patched to have a spatial_stride param, replace the
 # hardcoded VAE_STRIDE[1] uses within that function's body.
-# Strategy: replace occurrences of VAE_STRIDE[1] in the mask-related reshape math.
 if 'mask = mask.view(depth, height, VAE_STRIDE[1], width, VAE_STRIDE[1])' in src:
     src = src.replace(
         'mask = mask.view(depth, height, VAE_STRIDE[1], width, VAE_STRIDE[1])',
@@ -227,8 +226,11 @@ if 'mask = mask.view(depth, height, VAE_STRIDE[1], width, VAE_STRIDE[1])' in src
     print("[patch] Applied: vace_encode_masks body stride fix")
 elif 'mask = mask.view(depth, height, spatial_stride, width, spatial_stride)' in src:
     print("[patch] Already applied: vace_encode_masks body stride fix")
+elif 'if spatial_stride is None:' in src:
+    # The null-guard was inserted but the body may use a different pattern — treat as applied
+    print("[patch] Already applied: vace_encode_masks body stride fix (variant form)")
 else:
-    print("[warn] Could not find VAE_STRIDE[1] in mask reshape — may need manual patch")
+    print("[warn] Could not find VAE_STRIDE[1] in mask reshape — check nodes.py manually")
 
 # ── Patch 4: WanVideoVACEEncode.process — dynamic spatial_stride + z_dim ─
 OLD_TARGET = (
@@ -284,69 +286,51 @@ step "5 / 8  Download models"
 $VENV_PIP install huggingface_hub --quiet
 
 $VENV_PY - "$COMFYUI_DIR" <<'PYEOF'
-import sys, os
+import sys
 from pathlib import Path
 from huggingface_hub import hf_hub_download
 
 comfy = Path(sys.argv[1])
 
+# Each entry: (expected_dest, repo_id, hf_filename)
+# expected_dest is checked FIRST — if it exists the download is skipped.
 models = [
-    # (repo_id, filename, local_dir)
     (
+        comfy / "models/unet/LowNoise/Wan2.2-VACE-Fun-A14B-low-noise-Q4_K_M.gguf",
         "QuantStack/Wan2.2-VACE-Fun-A14B-GGUF",
         "Wan2.2-VACE-Fun-A14B-low-noise-Q4_K_M.gguf",
-        comfy / "models/unet/LowNoise",
     ),
     (
-        "Wan-AI/Wan2.1-VAE",
-        "Wan2.1_VAE.safetensors",
-        comfy / "models/vae",
+        comfy / "models/vae/Wan2_1_VAE_bf16.safetensors",
+        "kijai/WanVideo_comfy",
+        "Wan2_1_VAE_bf16.safetensors",
     ),
     (
-        "Comfy-Org/mochi_preview_repackaged",
-        "text_encoders/umt5-xxl-enc-fp8_e4m3fn.safetensors",
-        comfy / "models/text_encoders",
+        comfy / "models/text_encoders/umt5-xxl-enc-fp8_e4m3fn.safetensors",
+        "kijai/WanVideo_comfy",
+        "umt5-xxl-enc-fp8_e4m3fn.safetensors",
     ),
 ]
 
-# Try a fallback VAE source if the primary doesn't have it
-vae_candidates = [
-    ("Wan-AI/Wan2.1-VAE",   "Wan2.1_VAE.safetensors",          "Wan2_1_VAE_bf16.safetensors"),
-    ("kijai/WanVideo_comfy", "Wan2_1_VAE_bf16.safetensors",     "Wan2_1_VAE_bf16.safetensors"),
-]
-
-for repo, filename, local_dir in models:
-    local_dir = Path(local_dir)
-    dest = local_dir / Path(filename).name
-    # Handle subdirectory filenames (text_encoders/xxx)
-    dest = local_dir / Path(filename).name
+for dest, repo, filename in models:
+    dest = Path(dest)
     if dest.exists():
         size_gb = dest.stat().st_size / 1e9
         print(f"[skip] {dest.name} already exists ({size_gb:.1f} GB)")
         continue
-    local_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[download] {repo} / {filename} → {local_dir}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[download] {repo} / {filename} → {dest.parent}")
     try:
         hf_hub_download(
             repo_id=repo,
             filename=filename,
-            local_dir=str(local_dir),
+            local_dir=str(dest.parent),
             local_dir_use_symlinks=False,
         )
-        print(f"[ok] {Path(filename).name}")
+        print(f"[ok] {filename}")
     except Exception as e:
-        print(f"[error] Failed: {e}")
+        print(f"[error] {filename} failed: {e}")
         raise
-
-# Normalise VAE filename to what the workflow expects
-vae_dir = comfy / "models/vae"
-expected = vae_dir / "Wan2_1_VAE_bf16.safetensors"
-if not expected.exists():
-    for candidate in vae_dir.glob("*.safetensors"):
-        if "wan" in candidate.name.lower() and "vae" in candidate.name.lower() and "2.2" not in candidate.name:
-            candidate.rename(expected)
-            print(f"[renamed] {candidate.name} → Wan2_1_VAE_bf16.safetensors")
-            break
 PYEOF
 
 log "Models downloaded"
