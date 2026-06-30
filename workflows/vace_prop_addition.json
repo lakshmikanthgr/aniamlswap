@@ -2,7 +2,7 @@
   "1": {
     "class_type": "VHS_LoadVideo",
     "inputs": {
-      "video": "source.mp4",
+      "video": "guitar_bird.mp4",
       "force_rate": 16,
       "custom_width": 832,
       "custom_height": 480,
@@ -37,8 +37,8 @@
     "inputs": {
       "model_name": "umt5-xxl-enc-fp8_e4m3fn.safetensors",
       "precision": "bf16",
-      "positive_prompt": "DESCRIBE YOUR SCENE HERE with the prop or change you want added, identical pose and motion to original, photorealistic, natural lighting, consistent with original scene",
-      "negative_prompt": "blurry, distorted, extra limbs, floating objects, disconnected props, flickering, inconsistent motion, morphing",
+      "positive_prompt": "person playing an acoustic guitar, strumming naturally, guitar held in both hands with correct posture, same body position and motion as original, photorealistic, natural lighting, consistent with original scene",
+      "negative_prompt": "blurry, distorted, floating guitar, disconnected hands, extra limbs, flickering, inconsistent motion, morphing, deformed instrument",
       "quantization": "disabled",
       "use_disk_cache": true,
       "device": "gpu"
@@ -100,7 +100,7 @@
       "images": ["7", 0],
       "frame_rate": 16,
       "loop_count": 0,
-      "filename_prefix": "vace_output",
+      "filename_prefix": "guitar_bird_output",
       "format": "video/h264-mp4",
       "pingpong": false,
       "save_output": true
